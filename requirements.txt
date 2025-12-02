@@ -1,0 +1,24 @@
+# 深度学习和Transformers
+transformers>=4.30.0
+protobuf>=3.20.0
+sentencepiece>=0.1.99
+
+# 机器学习
+lightgbm>=4.0.0
+scikit-learn>=1.3.0
+
+# 数据处理
+numpy>=1.24.0
+pandas>=2.0.0
+
+# 可视化（可选）
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# 进度条
+tqdm>=4.65.0
+
+# 注意事项:
+# 1. 如果使用GPU训练DeBERTa，请安装对应的PyTorch CUDA版本
+# 2. 推荐使用conda或虚拟环境安装依赖
+# 3. 安装命令: pip install -r requirements.txt
