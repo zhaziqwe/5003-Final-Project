@@ -1,10 +1,10 @@
 # LLM 分类器
 
-> **核心理念**：提供特征 + baseline，**队友**只需关注 **队友的工作**
+> **核心理念**：特征提取 + baseline + 不同HPO，**你**只需关注 **HPO的工作（见HPO部分）**
 
 ---
 
-## 📖 说明
+## 说明
 
 ### 已完成
 
@@ -162,7 +162,7 @@ models/
 **Q: 找不到特征文件？**
 
 ```bash
-python main.py --mode extract
+data/processed 文件夹下
 ```
 
 **Q: 怎么查看可用算法？**
