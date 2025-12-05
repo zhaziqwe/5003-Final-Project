@@ -34,20 +34,12 @@ env/
 *~
 .DS_Store
 
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
-
 # 模型文件（体积大）
 models/*.txt
 models/*.pkl
 models/*.bin
 models/*.pt
 models/*.pth
-
-# 输出文件
-outputs/*
-!outputs/.gitkeep
 
 # 日志文件
 *.log

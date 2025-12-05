@@ -1,24 +1,24 @@
-# 深度学习和Transformers
+# Core dependencies
+numpy>=1.21.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+
+# Deep Learning
+torch>=2.0.0
 transformers>=4.30.0
-protobuf>=3.20.0
-sentencepiece>=0.1.99
 
-# 机器学习
-lightgbm>=4.0.0
-scikit-learn>=1.3.0
+# Tree-based models
+lightgbm>=3.3.0
 
-# 数据处理
-numpy>=1.24.0
-pandas>=2.0.0
+# HPO algorithms (optional - install as needed by each team member)
+optuna>=3.0.0          # C同学需要
+openbox>=0.8.0         # D同学需要（推荐，支持Windows）
+# 注意: SMAC在Windows上安装困难（需要SWIG编译器），建议使用OpenBox
 
-# 可视化（可选）
-matplotlib>=3.7.0
-seaborn>=0.12.0
+# Visualization
+matplotlib>=3.5.0
+seaborn>=0.11.0
+tqdm>=4.60.0
 
-# 进度条
-tqdm>=4.65.0
-
-# 注意事项:
-# 1. 如果使用GPU训练DeBERTa，请安装对应的PyTorch CUDA版本
-# 2. 推荐使用conda或虚拟环境安装依赖
-# 3. 安装命令: pip install -r requirements.txt
+# Utilities
+scipy>=1.7.0

@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from feature_extraction import extract_and_save_features
-from train import objective_function_factory
+from models import get_model, list_models
 from hpo import get_hpo_algorithm, list_algorithms
 
 logging.basicConfig(
@@ -38,14 +38,48 @@ def run_feature_extraction(args):
     logger.info("\n特征提取完成！")
 
 
+def objective_function_factory(model_class, X, y, n_folds=5):
+    """
+    创建目标函数（用于HPO）
+    
+    Args:
+        model_class: 模型类
+        X: 特征数组
+        y: 标签数组
+        n_folds: 交叉验证折数
+        
+    Returns:
+        objective_function: 接受参数字典，返回logloss的函数
+    """
+    def objective(params):
+        """
+        目标函数
+        
+        Args:
+            params: 超参数字典
+            
+        Returns:
+            float: 交叉验证OOF logloss
+        """
+        # 创建模型
+        model = model_class(params=params, n_folds=n_folds)
+        
+        # 训练并获取CV得分
+        cv_score = model.train_with_cv(X, y, verbose=False)
+        
+        return cv_score
+    
+    return objective
+
+
 def run_hpo(args):
     """
     运行超参数优化（核心函数）
-    自动选择并运行指定的HPO算法
-    所有优化参数从配置文件读取
+    支持多模型、多HPO算法
     """
     logger.info("="*80)
-    logger.info(f"HPO超参数优化 - 算法: {args.hpo_algorithm}")
+    logger.info(f"HPO超参数优化")
+    logger.info(f"模型: {args.model} | HPO算法: {args.hpo_algorithm}")
     logger.info("="*80)
     
     # 检查特征文件是否存在
@@ -62,21 +96,29 @@ def run_hpo(args):
     test_ids = np.load(args.test_ids_path)
     logger.info(f"训练集: {X_train.shape}, 测试集: {X_test.shape}")
     
-    # 自动获取HPO算法类（根据命令行参数）
+    # 获取模型类
+    ModelClass = get_model(args.model)
+    
+    # 获取HPO算法类
     HPOClass = get_hpo_algorithm(args.hpo_algorithm)
     
-    # 初始化HPO算法（参数由各HPO算法自己设置）
-    optimizer = HPOClass()
-    
-    # 创建目标函数（使用HPO算法自己设置的cv_folds）
-    objective_fn = objective_function_factory(
-        X_train, 
-        y_train,
-        n_folds=optimizer.cv_folds,
-        early_stopping_rounds=50
+    # 初始化HPO算法
+    optimizer = HPOClass(
+        model_name=args.model,
+        n_trials=args.n_trials,
+        cv_folds=5,
+        random_state=42
     )
     
-    # 执行优化（参数从配置文件读取）
+    # 创建目标函数
+    objective_fn = objective_function_factory(
+        ModelClass, 
+        X_train, 
+        y_train,
+        n_folds=5
+    )
+    
+    # 执行优化
     best_params, best_score = optimizer.optimize(
         objective_function=objective_fn,
         verbose=True
@@ -84,13 +126,19 @@ def run_hpo(args):
     
     # 保存结果
     os.makedirs(args.model_dir, exist_ok=True)
-    history_path = os.path.join(args.model_dir, f'{args.hpo_algorithm}_history.json')
+    history_path = os.path.join(
+        args.model_dir, 
+        f'{args.model}_{args.hpo_algorithm}_history.json'
+    )
     optimizer.save_history(history_path)
     logger.info(f"优化历史已保存: {history_path}")
     
-    # 绘制优化历史（如果支持）
+    # 绘制优化历史
     try:
-        plot_path = os.path.join(args.model_dir, f'{args.hpo_algorithm}_history.png')
+        plot_path = os.path.join(
+            args.model_dir, 
+            f'{args.model}_{args.hpo_algorithm}_history.png'
+        )
         optimizer.plot_optimization_history(plot_path)
         logger.info(f"可视化图已保存: {plot_path}")
     except Exception as e:
@@ -101,10 +149,9 @@ def run_hpo(args):
     logger.info("使用最佳参数训练最终模型")
     logger.info("="*80)
     
-    from train import LightGBMTrainer
     import pandas as pd
     
-    trainer = LightGBMTrainer(params=best_params, n_folds=optimizer.cv_folds)
+    trainer = ModelClass(params=best_params, n_folds=5)
     final_cv_score = trainer.train_with_cv(X_train, y_train)
     
     # 保存模型
@@ -126,39 +173,62 @@ def run_hpo(args):
         'target_6': test_predictions[:, 6]
     })
     
-    os.makedirs(os.path.dirname(args.output_path), exist_ok=True)
-    submission.to_csv(args.output_path, index=False)
+    # 修改输出文件名以包含模型和算法信息
+    output_dir = os.path.dirname(args.output_path)
+    output_filename = f'{args.model}_{args.hpo_algorithm}_submission.csv'
+    output_path = os.path.join(output_dir, output_filename)
     
-    logger.info(f"\n提交文件已保存: {args.output_path}")
+    os.makedirs(output_dir, exist_ok=True)
+    submission.to_csv(output_path, index=False)
+    
+    logger.info(f"\n提交文件已保存: {output_path}")
     logger.info(f"最终CV得分: {final_cv_score:.6f}")
     
     return best_params, best_score
 
 
 def main():
-    """主函数 - 极简版，只有2个参数"""
+    """
+    主函数 - 超级简单版
+    
+    使用示例:
+        python main.py --mode extract                              # 提取特征
+        python main.py --model lightgbm --algo random              # LightGBM + Random Search
+        python main.py --model svm --algo grid                     # SVM + Grid Search
+        python main.py --model mlp --algo tpe                      # MLP + TPE
+    """
     parser = argparse.ArgumentParser(
-        description='LLM分类器 - 极简版Baseline（只有2个参数！）',
+        description='DSAA5003 Final Project - 多模型多HPO方法对比',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
-  python main.py                            # 默认运行HPO（random算法）
-  python main.py --mode extract             # 提取特征
-  python main.py --algo bayesian            # 使用其他算法
+  python main.py --mode extract                       # 提取DeBERTa特征
+  python main.py --model lightgbm --algo random       # LightGBM + Random Search
+  python main.py --model svm --algo grid              # SVM + Grid Search  
+  python main.py --model mlp --algo tpe               # MLP + TPE
+  python main.py --model lightgbm --algo smac         # LightGBM + SMAC
         """
     )
     
-    # ===== 只保留2个核心参数 =====
+    # ===== 核心参数 =====
     parser.add_argument('--mode', type=str, default='hpo',
                        choices=['extract', 'hpo'],
                        help='运行模式: extract(特征提取) 或 hpo(超参数优化)')
     
+    parser.add_argument('--model', type=str, default='lightgbm',
+                       choices=list_models(),
+                       help=f'模型名称，可用: {list_models()}')
+    
     parser.add_argument('--algo', type=str, default='random',
+                       choices=list_algorithms(),
                        help=f'HPO算法名称，可用: {list_algorithms()}')
+    
+    parser.add_argument('--n_trials', type=int, default=50,
+                       help='HPO搜索次数（默认50）')
     
     args = parser.parse_args()
     
-    # ===== 固定配置（直接在代码中定义，简单直接）=====
+    # ===== 固定配置 =====
     args.hpo_algorithm = args.algo  # 统一使用algo
     args.train_path = 'data/raw/train.csv'
     args.test_path = 'data/raw/test.csv'
@@ -174,11 +244,13 @@ def main():
     
     # 打印配置
     logger.info("="*80)
-    logger.info("LLM分类器 - 极简Baseline")
+    logger.info("DSAA5003 Final Project - 多模型多HPO对比")
     logger.info("="*80)
     logger.info(f"运行模式: {args.mode}")
     if args.mode == 'hpo':
+        logger.info(f"模型: {args.model}")
         logger.info(f"HPO算法: {args.hpo_algorithm}")
+        logger.info(f"搜索次数: {args.n_trials}")
     logger.info("="*80 + "\n")
     
     try:
@@ -203,4 +275,3 @@ def main():
 
 if __name__ == '__main__':
     exit(main())
-
