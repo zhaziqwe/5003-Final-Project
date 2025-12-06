@@ -124,11 +124,11 @@ def run_hpo(args):
         verbose=True
     )
     
-    # 保存结果（包含试验轮次）
+    # 保存结果
     os.makedirs(args.model_dir, exist_ok=True)
     history_path = os.path.join(
         args.model_dir, 
-        f'{args.model}_{args.hpo_algorithm}_{args.n_trials}trials_history.json'
+        f'{args.model}_{args.hpo_algorithm}_history.json'
     )
     optimizer.save_history(history_path)
     logger.info(f"优化历史已保存: {history_path}")
@@ -137,7 +137,7 @@ def run_hpo(args):
     try:
         plot_path = os.path.join(
             args.model_dir, 
-            f'{args.model}_{args.hpo_algorithm}_{args.n_trials}trials_history.png'
+            f'{args.model}_{args.hpo_algorithm}_history.png'
         )
         optimizer.plot_optimization_history(plot_path)
         logger.info(f"可视化图已保存: {plot_path}")
@@ -173,9 +173,9 @@ def run_hpo(args):
         'target_6': test_predictions[:, 6]
     })
     
-    # 修改输出文件名以包含模型、算法和试验轮次信息
+    # 修改输出文件名以包含模型和算法信息
     output_dir = os.path.dirname(args.output_path)
-    output_filename = f'{args.model}_{args.hpo_algorithm}_{args.n_trials}trials_submission.csv'
+    output_filename = f'{args.model}_{args.hpo_algorithm}_submission.csv'
     output_path = os.path.join(output_dir, output_filename)
     
     os.makedirs(output_dir, exist_ok=True)
